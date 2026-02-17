@@ -37,21 +37,23 @@ router.get("/center-summary", async (req, res) => {
 });
 
 /* =========================
-   CENTER DETAIL (FINAL FIX)
-   → NOW BASED ON biometric_records
+   CENTER DETAIL (SHOW ALL CANDIDATES + STATUS)
 ========================= */
 router.get("/center/:centerCode/candidates", async (req, res) => {
   const { centerCode } = req.params;
 
   const [rows] = await db.query(`
     SELECT
-      b.roll_no,
-      b.name,
-      b.shift,
+      c.roll_no,
+      c.name,
+      c.shift,
       b.captured_at
-    FROM biometric_records b
-    WHERE b.center_code = ?
-    ORDER BY b.roll_no
+    FROM candidates c
+    LEFT JOIN biometric_records b
+      ON b.roll_no = c.roll_no
+      AND b.center_code = c.center_code
+    WHERE c.center_code = ?
+    ORDER BY c.roll_no
   `, [centerCode]);
 
   res.json({ success: true, data: rows });
@@ -99,39 +101,73 @@ router.post("/center", async (req, res) => {
 });
 
 /* =========================
-   CSV UPLOAD
+   CSV UPLOAD (AUTO CREATE CENTER FIXED)
 ========================= */
 router.post(
   "/center/:centerCode/csv",
   upload.single("file"),
   async (req, res) => {
-    const centerCode = req.params.centerCode;
-    const rows = [];
+    try {
+      const centerCode = req.params.centerCode;
+      const rows = [];
 
-    fs.createReadStream(req.file.path)
-      .pipe(csv())
-      .on("data", (row) => {
-        if (!row.roll_no || !row.name || !row.shift) return;
+      if (!req.file) {
+        return res.status(400).json({ message: "No file uploaded" });
+      }
 
-        rows.push([
-          centerCode,
-          row.roll_no.trim(),
-          row.name.trim(),
-          row.shift.trim()
-        ]);
-      })
-      .on("end", async () => {
-        if (rows.length > 0) {
+      fs.createReadStream(req.file.path)
+        .pipe(csv())
+        .on("data", (row) => {
+          if (!row.roll_no || !row.name || !row.shift) return;
+
+          rows.push([
+            centerCode,
+            row.roll_no.trim(),
+            row.name.trim(),
+            row.shift.trim()
+          ]);
+        })
+        .on("end", async () => {
+
+          if (rows.length === 0) {
+            fs.unlinkSync(req.file.path);
+            return res.json({ success: true, inserted: 0 });
+          }
+
+          // 🔵 1️⃣ Check if center exists
+          const [[existingCenter]] = await db.query(
+            "SELECT center_code FROM centers WHERE center_code=?",
+            [centerCode]
+          );
+
+          // 🔵 2️⃣ Auto create center if not exists
+          if (!existingCenter) {
+            await db.query(
+              "INSERT INTO centers (center_code, center_name) VALUES (?, ?)",
+              [centerCode, centerCode]
+            );
+          }
+
+          // 🔵 3️⃣ Insert candidates
           await db.query(`
             INSERT IGNORE INTO candidates
             (center_code, roll_no, name, shift)
             VALUES ?
           `, [rows]);
-        }
 
-        fs.unlinkSync(req.file.path);
-        res.json({ success: true, inserted: rows.length });
-      });
+          fs.unlinkSync(req.file.path);
+
+          res.json({
+            success: true,
+            inserted: rows.length,
+            center_auto_created: !existingCenter
+          });
+        });
+
+    } catch (err) {
+      console.error("CSV Upload Error:", err);
+      res.status(500).json({ message: "Server error" });
+    }
   }
 );
 
