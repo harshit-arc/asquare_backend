@@ -86,19 +86,49 @@ router.get("/centers", async (req, res) => {
   res.json({ success: true, data: rows });
 });
 
-/* =========================
-   CREATE CENTER
-========================= */
+/*create center route */
+const crypto = require("crypto");
+
 router.post("/center", async (req, res) => {
-  const { center_code, center_name } = req.body;
+  try {
+    const { center_code, center_name } = req.body;
 
-  await db.query(
-    "INSERT INTO centers (center_code, center_name) VALUES (?, ?)",
-    [center_code, center_name]
-  );
+    if (!center_code || !center_name) {
+      return res.status(400).json({ message: "Missing center data" });
+    }
 
-  res.json({ success: true });
+    // 🔵 1️⃣ Insert into centers table
+    await db.query(
+      "INSERT INTO centers (center_code, center_name) VALUES (?, ?)",
+      [center_code, center_name]
+    );
+
+    // 🔵 2️⃣ Auto generate default password (example: 123456)
+    const defaultPassword = "123456";
+
+    const hashedPassword = crypto
+      .createHash("sha256")
+      .update(defaultPassword)
+      .digest("hex");
+
+    // 🔵 3️⃣ Insert into center_users table
+    await db.query(
+      "INSERT INTO center_users (center_code, password) VALUES (?, ?)",
+      [center_code, hashedPassword]
+    );
+
+    res.json({
+      success: true,
+      center_code,
+      default_password: defaultPassword
+    });
+
+  } catch (err) {
+    console.error("Create Center Error:", err);
+    res.status(500).json({ message: "Server error" });
+  }
 });
+
 
 /* =========================
    CSV UPLOAD (AUTO CREATE CENTER FIXED)
