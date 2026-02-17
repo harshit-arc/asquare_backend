@@ -67,12 +67,15 @@ router.get("/center/:centerCode/shift-attendance", async (req, res) => {
 
   const [rows] = await db.query(`
     SELECT
-      shift,
-      COUNT(*) AS total_candidates,
-      SUM(CASE WHEN captured_at IS NOT NULL THEN 1 ELSE 0 END) AS completed
-    FROM biometric_records
-    WHERE center_code = ?
-    GROUP BY shift
+      c.shift,
+      COUNT(c.roll_no) AS total_candidates,
+      SUM(CASE WHEN b.captured_at IS NOT NULL THEN 1 ELSE 0 END) AS completed
+    FROM candidates c
+    LEFT JOIN biometric_records b
+      ON b.roll_no = c.roll_no
+      AND b.center_code = c.center_code
+    WHERE c.center_code = ?
+    GROUP BY c.shift
   `, [centerCode]);
 
   res.json({ success: true, data: rows });
@@ -260,5 +263,20 @@ router.get("/center/:centerCode/export-pdf", async (req, res) => {
 
   doc.end();
 });
+
+router.get("/live-devices", async (req, res) => {
+
+  const [rows] = await db.query(`
+    SELECT
+      center_code,
+      device_id,
+      last_seen
+    FROM center_devices
+    ORDER BY last_seen DESC
+  `);
+
+  res.json({ success: true, data: rows });
+});
+
 
 module.exports = router;
