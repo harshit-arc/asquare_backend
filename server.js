@@ -10,37 +10,33 @@ const PORT = 3000;
 
 /* ======================
    GLOBAL MIDDLEWARE
-   ====================== */
+====================== */
 app.use(cors());
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
+app.use(express.json({ limit: "20mb" }));
+app.use(express.urlencoded({ extended: true, limit: "20mb" }));
+
+/* ======================
+   MAKE UPLOADS PUBLIC
+====================== */
+app.use("/uploads", express.static("uploads"));
 
 /* ======================
    HEALTH CHECK
-   ====================== */
+====================== */
 app.get("/health", (req, res) => {
   res.send("BACKEND HEALTH OK");
 });
 
-app.use((req, res, next) => {
-  res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate, proxy-revalidate");
-  res.setHeader("Pragma", "no-cache");
-  res.setHeader("Expires", "0");
-  res.setHeader("Surrogate-Control", "no-store");
-  next();
-});
-
-
 /* ======================
    ROUTES
-   ====================== */
+====================== */
 app.use("/api/auth", authRoutes);
 app.use("/api/admin", adminRoutes);
 app.use("/api/biometric", biometricRoutes);
 
 /* ======================
-   SERVER START
-   ====================== */
+   START SERVER
+====================== */
 app.listen(PORT, "0.0.0.0", () => {
-  console.log(`Backend running on http://0.0.0.0:${PORT}`);
+  console.log(`Server running on port ${PORT}`);
 });
