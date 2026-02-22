@@ -50,15 +50,19 @@ router.get("/candidates/:centerCode", verifyCenter, async (req, res) => {
 /* =========================
    SAVE BIOMETRIC (BASE64)
 ========================= */
+ 
 router.post("/save", verifyCenter, async (req, res) => {
   try {
     const { roll_no, shift, photo_base64, device_id } = req.body;
     const center_code = req.center.center_code;
 
-    if (!roll_no || !photo_base64) {
+    console.log("SAVE REQUEST:", roll_no);
+
+    if (!roll_no || !shift || !photo_base64 || !device_id) {
       return res.status(400).json({ message: "Missing fields" });
     }
 
+    // prevent duplicate
     const [[exists]] = await db.query(
       `SELECT id FROM biometric_records
        WHERE center_code=? AND roll_no=?`,
@@ -101,9 +105,10 @@ router.post("/save", verifyCenter, async (req, res) => {
     res.json({ success: true });
 
   } catch (err) {
-    console.error(err);
+    console.error("SAVE ERROR:", err);
     res.status(500).json({ success: false });
   }
 });
+
 
 module.exports = router;

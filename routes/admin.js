@@ -40,24 +40,38 @@ router.get("/center-summary", async (req, res) => {
    CENTER DETAIL (SHOW ALL CANDIDATES + STATUS)
 ========================= */
 router.get("/center/:centerCode/candidates", async (req, res) => {
-  const { centerCode } = req.params;
+  try {
+    const { centerCode } = req.params;
 
-  const [rows] = await db.query(`
-    SELECT
-      c.roll_no,
-      c.name,
-      c.shift,
-      b.captured_at
-    FROM candidates c
-    LEFT JOIN biometric_records b
-      ON b.roll_no = c.roll_no
-      AND b.center_code = c.center_code
-    WHERE c.center_code = ?
-    ORDER BY c.roll_no
-  `, [centerCode]);
+    const [rows] = await db.query(`
+      SELECT
+        c.roll_no,
+        c.name,
+        c.shift,
+        b.captured_at,
+        b.photo_path
+      FROM candidates c
+      LEFT JOIN biometric_records b
+        ON b.roll_no = c.roll_no
+        AND b.center_code = c.center_code
+      WHERE c.center_code = ?
+      ORDER BY c.roll_no
+    `, [centerCode]);
 
-  res.json({ success: true, data: rows });
+    res.json({
+      success: true,
+      data: rows
+    });
+
+  } catch (err) {
+    console.error("CENTER DETAIL ERROR:", err);
+    res.status(500).json({
+      success: false,
+      message: "Server error"
+    });
+  }
 });
+
 
 /* =========================
    SHIFT ATTENDANCE
